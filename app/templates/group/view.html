@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-8">
+        <h2>{{ group.name }}</h2>
+        <p class="text-muted">{{ group.description }}</p>
+    </div>
+    <div class="col-4 text-end">
+        <form action="{{ url_for('group.leave', group_id=group.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to leave this group?');">
+            <button type="submit" class="btn btn-danger">Leave Group</button>
+        </form>
+    </div>
+</div>
+<hr>
+<div class="row mt-4">
+    <div class="col-md-6">
+        <h4>Members</h4>
+        <ul class="list-group mb-4">
+            {% for membership in memberships %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ membership.user.username }}
+                <span class="badge bg-secondary rounded-pill">Joined: {{ membership.joined_at.strftime('%Y-%m-%d') }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="col-md-6">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title">Add Member</h5>
+                <form method="POST" action="">
+                    {{ form.hidden_tag() }}
+                    <div class="input-group mb-3">
+                        {% if form.email.errors %}
+                            {{ form.email(class="form-control is-invalid", placeholder="User Email") }}
+                        {% else %}
+                            {{ form.email(class="form-control", placeholder="User Email") }}
+                        {% endif %}
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

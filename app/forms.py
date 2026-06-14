@@ -24,3 +24,12 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
+
+class GroupForm(FlaskForm):
+    name = StringField('Group Name', validators=[DataRequired(), Length(min=2, max=100)])
+    description = StringField('Description', validators=[Length(max=255)])
+    submit = SubmitField('Create Group')
+
+class AddMemberForm(FlaskForm):
+    email = StringField('User Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Add Member')

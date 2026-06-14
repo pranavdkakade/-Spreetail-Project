@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h2>Your Groups</h2>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('group.create') }}" class="btn btn-primary">Create New Group</a>
+    </div>
+</div>
+
+<div class="row mt-4">
+    {% for group in groups %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ group.name }}</h5>
+                <p class="card-text text-muted">{{ group.description }}</p>
+                <a href="{{ url_for('group.view', group_id=group.id) }}" class="btn btn-outline-primary btn-sm">View Group</a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center">
+        <p class="text-muted">You are not part of any groups yet.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
