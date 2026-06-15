@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4">
+    <!-- Breadcrumb navigation -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('group.index') }}">My Groups</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('group.view', group_id=group.id) }}">{{ group.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ user.username }}'s Ledger</li>
+        </ol>
+    </nav>
+
+    <!-- Header info -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-0">{{ user.username }}'s Financial Ledger</h2>
+            <p class="text-muted mb-0">Detailed breakdown of expenses, split shares, and settlements for {{ user.username }} in group <strong>{{ group.name }}</strong>.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('group.view', group_id=group.id) }}" class="btn btn-outline-secondary rounded-pill">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Balance Cards -->
+    <div class="row g-3 mb-5">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 bg-light p-3">
+                <div class="text-muted small fw-semibold mb-1">Expenses Paid (A)</div>
+                <div class="fs-4 fw-bold text-success font-monospace">+₹{{ "{:,.2f}".format(total_paid) }}</div>
+                <div class="text-muted small mt-1">Paid directly to merchants</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 bg-light p-3">
+                <div class="text-muted small fw-semibold mb-1">Split Shares Owed (B)</div>
+                <div class="fs-4 fw-bold text-danger font-monospace">-₹{{ "{:,.2f}".format(total_splits) }}</div>
+                <div class="text-muted small mt-1">Your share of all group spends</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 bg-light p-3">
+                <div class="text-muted small fw-semibold mb-1">Settlements Sent/Recv (C)</div>
+                <div class="fs-4 fw-bold text-info font-monospace">
+                    +₹{{ "{:.0f}".format(total_settlements_sent) }} / -₹{{ "{:.0f}".format(total_settlements_recv) }}
+                </div>
+                <div class="text-muted small mt-1">Cash transfers recorded</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow rounded-4 p-3 {% if net_balance > 0.009 %}bg-success text-white{% elif net_balance < -0.009 %}bg-danger text-white{% else %}bg-secondary text-white{% endif %}">
+                <div class="small fw-semibold mb-1 text-white-50">Net Group Balance (A - B + C)</div>
+                <div class="fs-3 fw-bold font-monospace">
+                    {% if net_balance > 0.009 %}
+                        +₹{{ "{:,.2f}".format(net_balance) }}
+                    {% elif net_balance < -0.009 %}
+                        -₹{{ "{:,.2f}".format(abs(net_balance)) }}
+                    {% else %}
+                        ₹0.00
+                    {% endif %}
+                </div>
+                <div class="small mt-1 text-white-50">
+                    {% if net_balance > 0.009 %}
+                        Group owes you money
+                    {% elif net_balance < -0.009 %}
+                        You owe the group money
+                    {% else %}
+                        All settled up!
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Math Audit Formula Verification -->
+    <div class="alert alert-info border-0 rounded-4 shadow-sm mb-5 p-4">
+        <h5 class="fw-bold mb-2"><i class="bi bi-info-circle-fill"></i> Balance Equation Audit (Rohan's Request)</h5>
+        <code class="font-monospace fs-6 text-dark d-block mb-2">
+            Net Balance = (Expenses Paid) - (Split Shares Owed) + (Settlements Sent) - (Settlements Received)
+        </code>
+        <div class="font-monospace text-muted mt-2">
+            = ₹{{ "{:,.2f}".format(total_paid) }} - ₹{{ "{:,.2f}".format(total_splits) }} + ₹{{ "{:,.2f}".format(total_settlements_sent) }} - ₹{{ "{:,.2f}".format(total_settlements_recv) }}
+            = <strong class="text-dark">
+                {% if net_balance > 0.009 %}
+                    +₹{{ "{:,.2f}".format(net_balance) }}
+                {% elif net_balance < -0.009 %}
+                    -₹{{ "{:,.2f}".format(net_balance) }}
+                {% else %}
+                    ₹0.00
+                {% endif %}
+            </strong>
+        </div>
+    </div>
+
+    <!-- Detailed Ledger Tabs -->
+    <div class="card border-0 shadow rounded-4 overflow-hidden mb-5">
+        <div class="card-header bg-dark p-0">
+            <ul class="nav nav-tabs nav-fill border-0" id="ledgerTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-white active border-0 py-3 rounded-0" id="owed-tab" data-bs-toggle="tab" data-bs-target="#owed-pane" type="button" role="tab" aria-selected="true">
+                        <i class="bi bi-arrow-down-left-circle"></i> Expenses Owed ({{ splits_owed|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-white border-0 py-3 rounded-0" id="paid-tab" data-bs-toggle="tab" data-bs-target="#paid-pane" type="button" role="tab" aria-selected="false">
+                        <i class="bi bi-arrow-up-right-circle"></i> Expenses Paid ({{ expenses_paid|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-white border-0 py-3 rounded-0" id="transfers-tab" data-bs-toggle="tab" data-bs-target="#transfers-pane" type="button" role="tab" aria-selected="false">
+                        <i class="bi bi-cash-stack"></i> Settlements Sent/Received
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body p-0">
+            <div class="tab-content" id="ledgerTabContent">
+                
+                <!-- Expenses Owed Pane -->
+                <div class="tab-pane fade show active p-4" id="owed-pane" role="tabpanel" tabindex="0">
+                    <h5 class="fw-bold mb-3 text-danger">Detailed Shares You Owe</h5>
+                    <p class="text-muted">These are the individual expenses that other members paid, split with you. The sum of your shares here forms your total owed share.</p>
+                    
+                    {% if not splits_owed %}
+                    <p class="text-muted text-center py-4">No owed expenses.</p>
+                    {% else %}
+                    <div class="table-responsive">
+                        <table class="table align-middle table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description / Notes</th>
+                                    <th>Paid By</th>
+                                    <th class="text-end">Total Amount</th>
+                                    <th class="text-end">Your Split Share</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for split in splits_owed %}
+                                <tr>
+                                    <td>{{ split.expense.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ split.expense.description }}</div>
+                                        {% if 'USD' in split.expense.description %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.75rem;">USD Conversion Trace</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="badge bg-info text-dark">{{ split.expense.paid_by.username }}</span></td>
+                                    <td class="text-end font-monospace">₹{{ "{:,.2f}".format(split.expense.amount) }}</td>
+                                    <td class="text-end font-monospace text-danger fw-bold">₹{{ "{:,.2f}".format(split.amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-light">
+                                    <td colspan="4" class="fw-bold text-end">Total Share Owed (B):</td>
+                                    <td class="text-end font-monospace text-danger fw-bold fs-5">₹{{ "{:,.2f}".format(total_splits) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Expenses Paid Pane -->
+                <div class="tab-pane fade p-4" id="paid-pane" role="tabpanel" tabindex="0">
+                    <h5 class="fw-bold mb-3 text-success">Expenses You Paid For</h5>
+                    <p class="text-muted">These are the group expenses you paid directly. Other members split these expenses with you, and their shares reduce what you owe the group.</p>
+                    
+                    {% if not expenses_paid %}
+                    <p class="text-muted text-center py-4">You have not recorded any paid expenses.</p>
+                    {% else %}
+                    <div class="table-responsive">
+                        <table class="table align-middle table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Split Type</th>
+                                    <th class="text-end">Total Amount Paid</th>
+                                    <th class="text-end">Others' Shared Burden</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for exp in expenses_paid %}
+                                <!-- Calculate what others owe on this expense (total amount minus what payer splits) -->
+                                {% set payer_split = exp.splits | selectattr('user_id', 'equalto', user.id) | list %}
+                                {% set payer_share = payer_split[0].amount if payer_split else 0.00 %}
+                                {% set others_share = exp.amount - payer_share %}
+                                <tr>
+                                    <td>{{ exp.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ exp.description }}</div>
+                                        {% if 'USD' in exp.description %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.75rem;">USD Conversion Trace</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border text-capitalize font-monospace">{{ exp.split_type | lower }}</span></td>
+                                    <td class="text-end font-monospace text-success fw-bold">₹{{ "{:,.2f}".format(exp.amount) }}</td>
+                                    <td class="text-end font-monospace text-muted">₹{{ "{:,.2f}".format(others_share) }}</td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-light">
+                                    <td colspan="3" class="fw-bold text-end">Total Spends Paid (A):</td>
+                                    <td class="text-end font-monospace text-success fw-bold fs-5">₹{{ "{:,.2f}".format(total_paid) }}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Transfers Pane -->
+                <div class="tab-pane fade p-4" id="transfers-pane" role="tabpanel" tabindex="0">
+                    <h5 class="fw-bold mb-3 text-info">Settlement Transfer History</h5>
+                    <p class="text-muted">Direct financial transfers between you and other group members. Cash sent increases your balance, while cash received decreases it.</p>
+                    
+                    <div class="row g-4">
+                        <!-- Settlements Sent -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-dark border-bottom pb-2">Settlements Sent (Cash Paid Out)</h6>
+                            {% if not settlements_paid %}
+                            <p class="text-muted py-2 small">No settlements sent.</p>
+                            {% else %}
+                            <div class="list-group list-group-flush">
+                                {% for setl in settlements_paid %}
+                                <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                                    <div>
+                                        <strong>Paid to {{ setl.payee.username }}</strong>
+                                        <div class="text-muted small">{{ setl.date.strftime('%Y-%m-%d') }}</div>
+                                    </div>
+                                    <span class="text-success font-monospace fw-bold">+₹{{ "{:,.2f}".format(setl.amount) }}</span>
+                                </div>
+                                {% endfor %}
+                                <div class="d-flex justify-content-between fw-bold pt-2">
+                                    <span>Total Sent:</span>
+                                    <span class="text-success font-monospace">₹{{ "{:,.2f}".format(total_settlements_sent) }}</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Settlements Received -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-dark border-bottom pb-2">Settlements Received (Cash Taken In)</h6>
+                            {% if not settlements_received %}
+                            <p class="text-muted py-2 small">No settlements received.</p>
+                            {% else %}
+                            <div class="list-group list-group-flush">
+                                {% for setl in settlements_received %}
+                                <div class="list-group-item px-0 py-2 d-flex justify-content-between">
+                                    <div>
+                                        <strong>Received from {{ setl.payer.username }}</strong>
+                                        <div class="text-muted small">{{ setl.date.strftime('%Y-%m-%d') }}</div>
+                                    </div>
+                                    <span class="text-danger font-monospace fw-bold">-₹{{ "{:,.2f}".format(setl.amount) }}</span>
+                                </div>
+                                {% endfor %}
+                                <div class="d-flex justify-content-between fw-bold pt-2">
+                                    <span>Total Received:</span>
+                                    <span class="text-danger font-monospace">₹{{ "{:,.2f}".format(total_settlements_recv) }}</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

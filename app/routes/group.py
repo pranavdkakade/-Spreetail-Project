@@ -240,10 +240,14 @@ def import_confirm(group_id):
         else:
             payer_user = user_mapping[rec['paid_by']]
             
+            desc = rec['description']
+            if rec['currency_original'] == 'USD':
+                desc = f"{desc} (USD {rec['amount_original']} @ {exchange_rate})"
+                
             expense = Expense(
                 group_id=group.id,
                 paid_by_id=payer_user.id,
-                description=rec['description'],
+                description=desc,
                 amount=Decimal(str(rec['amount_inr'])),
                 currency='INR',
                 date=rec_date,
@@ -295,4 +299,33 @@ def record_settlement(group_id):
 @group_bp.route('/<int:group_id>/members/<int:user_id>/ledger', methods=['GET'])
 @login_required
 def member_ledger(group_id, user_id):
-    return f"Stub for member ledger of user {user_id} in group {group_id}"
+    group = Group.query.get_or_404(group_id)
+    membership = GroupMember.query.filter_by(user_id=current_user.id, group_id=group.id, left_at=None).first()
+    if not membership:
+        flash('You are not an active member of this group.', 'danger')
+        return redirect(url_for('group.index'))
+        
+    user = User.query.get_or_404(user_id)
+    
+    from app.models.expense import Expense, ExpenseSplit, Settlement
+    
+    expenses_paid = Expense.query.filter_by(group_id=group_id, paid_by_id=user_id).order_by(Expense.date.desc()).all()
+    splits_owed = ExpenseSplit.query.join(Expense).filter(Expense.group_id == group_id, ExpenseSplit.user_id == user_id).order_by(Expense.date.desc()).all()
+    
+    settlements_paid = Settlement.query.filter_by(group_id=group_id, payer_id=user_id).order_by(Settlement.date.desc()).all()
+    settlements_recv = Settlement.query.filter_by(group_id=group_id, payee_id=user_id).order_by(Settlement.date.desc()).all()
+    
+    total_paid = sum(e.amount for e in expenses_paid) or Decimal('0.00')
+    total_splits = sum(s.amount for s in splits_owed) or Decimal('0.00')
+    total_settlements_sent = sum(s.amount for s in settlements_paid) or Decimal('0.00')
+    total_settlements_recv = sum(s.amount for s in settlements_recv) or Decimal('0.00')
+    
+    net_balance = total_paid - total_splits + total_settlements_sent - total_settlements_recv
+    
+    return render_template('group/ledger.html', group=group, user=user,
+                           expenses_paid=expenses_paid, splits_owed=splits_owed,
+                           settlements_paid=settlements_paid, settlements_received=settlements_recv,
+                           total_paid=total_paid, total_splits=total_splits,
+                           total_settlements_sent=total_settlements_sent,
+                           total_settlements_recv=total_settlements_recv,
+                           net_balance=net_balance)
