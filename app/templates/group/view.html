@@ -6,7 +6,8 @@
         <p class="text-muted">{{ group.description }}</p>
     </div>
     <div class="col-4 text-end">
-        <form action="{{ url_for('group.leave', group_id=group.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to leave this group?');">
+        <a href="{{ url_for('group.import_csv', group_id=group.id) }}" class="btn btn-outline-primary me-2">Import Expenses CSV</a>
+        <form action="{{ url_for('group.leave', group_id=group.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to leave this group?');" class="d-inline">
             <button type="submit" class="btn btn-danger">Leave Group</button>
         </form>
     </div>
