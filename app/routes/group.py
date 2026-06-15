@@ -8,6 +8,7 @@ from app.models.group import Group, GroupMember
 from app.models.user import User
 from app.forms import GroupForm, AddMemberForm
 from app.utils.importer import parse_csv_file
+from app.utils.balances import calculate_group_balances, simplify_debts
 
 group_bp = Blueprint('group', __name__, url_prefix='/groups')
 
@@ -66,8 +67,18 @@ def view(group_id):
                 flash('User added to the group successfully.', 'success')
         return redirect(url_for('group.view', group_id=group.id))
     
+    # Calculate balances and simplified debts
+    member_balances = calculate_group_balances(group.id)
+    simplified_debts_list = simplify_debts(member_balances)
+    
+    from app.models.expense import Expense, Settlement
+    expenses = Expense.query.filter_by(group_id=group.id).order_by(Expense.date.desc()).all()
+    settlements = Settlement.query.filter_by(group_id=group.id).order_by(Settlement.date.desc()).all()
+    
     active_memberships = GroupMember.query.filter_by(group_id=group.id, left_at=None).all()
-    return render_template('group/view.html', group=group, memberships=active_memberships, form=form)
+    return render_template('group/view.html', group=group, memberships=active_memberships, form=form,
+                           member_balances=member_balances, simplified_debts=simplified_debts_list,
+                           expenses=expenses, settlements=settlements)
 
 @group_bp.route('/<int:group_id>/leave', methods=['POST'])
 @login_required
@@ -270,3 +281,18 @@ def import_confirm(group_id):
     
     flash(f"CSV import complete. {imported_count} rows imported, {skipped_count} rows skipped. See import_report.txt for details.", "success")
     return redirect(url_for('group.view', group_id=group.id))
+
+@group_bp.route('/<int:group_id>/expenses/new', methods=['GET', 'POST'])
+@login_required
+def add_expense(group_id):
+    return f"Stub for adding expense to group {group_id}"
+
+@group_bp.route('/<int:group_id>/settlements/new', methods=['GET', 'POST'])
+@login_required
+def record_settlement(group_id):
+    return f"Stub for recording settlement in group {group_id}"
+
+@group_bp.route('/<int:group_id>/members/<int:user_id>/ledger', methods=['GET'])
+@login_required
+def member_ledger(group_id, user_id):
+    return f"Stub for member ledger of user {user_id} in group {group_id}"
