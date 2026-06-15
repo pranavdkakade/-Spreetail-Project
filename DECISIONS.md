@@ -12,7 +12,7 @@
 
 ### 3. Expense/Settlement Segregation
 - **Decision:** Completely separate the tables of `Expense` and `Settlement`.
-- **Why:** The core document explicitly noted a "settlement logged as an expense" mapped as an anomaly. To prevent debts multiplying exponentially instead of clearing logically, parsing transactions globally mapping "payments resolving debts" vs "new debts owed" ensures complete analytical stability. Doing so cleanly answers Aisha's request for single distinct values resolving debts seamlessly.
+- **Why:** The core document explicitly noted a "settlement logged as an expense" mapped as an anomaly. To prevent debts multiplying exponentially instead of calculating correctly, parsing transactions globally mapping "payments resolving debts" vs "new debts owed" ensures complete analytical stability. Doing so cleanly answers Aisha's request for single distinct values resolving debts.
 
 ### 4. Direct Mapped Split Amounts
 - **Decision:** Mapping `ExpenseSplit` natively recording hard `amount` decimals instead of global percentage weights.
@@ -21,3 +21,15 @@
 ### 5. Monetary Parsing & Types
 - **Decision:** Storing amounts as `DECIMAL(10,2)` via `Numeric` vs python floats globally.
 - **Why:** Floats inherit drifting trailing decimals causing fraction disparities at large scales (e.g., $100 / 3). Implementing exact precision types across the database protects calculations natively.
+
+### 6. Interactive CSV Approval Interface
+- **Decision:** Build an interactive preview approval screen in the browser rather than a command line utility or a silent guess.
+- **Why:** Fully satisfies Meera's request ("Clean up duplicates — but I want to approve anything the app deletes or changes"). It places the user in control, surfacing warnings, letting them choose which duplicates to drop, and validating corrections transparently before committing to the database.
+
+### 7. USD Conversion Rate Description Annotation
+- **Decision:** Append original USD currencies and exchange rates directly to the expense description fields (e.g. `(USD 540.00 @ 83.00)`) during import instead of creating separate tables/columns.
+- **Why:** Allows Priya and the roommates to trace USD conversion rates transparently on all dashboards (ledger, group view, lists) without violating existing SQL schema migrations.
+
+### 8. Dynamic HTTP POST splits over dynamic WTForms
+- **Decision:** Parse form POST data for split calculations directly in the controller instead of trying to map WTForms fields.
+- **Why:** Manual expense entry splits are dynamic (e.g. split values change whether it is EQUAL, PERCENTAGE, UNEQUAL, or SHARE, and change based on active members). Standard form parsing provides maximum flexibility, allowing clean Javascript toggles and precise backend validation of percentage sums.
