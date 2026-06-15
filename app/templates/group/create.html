@@ -1,36 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="text-center mb-4">Create a Group</h2>
-                <form method="POST" action="">
-                    {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.name.label(class="form-label") }}
-                        {% if form.name.errors %}
-                            {{ form.name(class="form-control is-invalid") }}
-                            <div class="invalid-feedback">
-                                {% for error in form.name.errors %}
-                                    <span>{{ error }}</span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            {{ form.name(class="form-control") }}
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.description.label(class="form-label") }}
-                        {{ form.description(class="form-control") }}
-                    </div>
-                    <div class="d-grid mt-4">
-                        {{ form.submit(class="btn btn-primary") }}
-                    </div>
-                </form>
-            </div>
-            <div class="card-footer text-muted text-center">
-                <a href="{{ url_for('group.index') }}">Back to Groups</a>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-0 shadow rounded-4 overflow-hidden">
+                <div class="card-header bg-dark text-white p-4">
+                    <h3 class="fw-bold mb-0">Create New Group</h3>
+                    <p class="text-white-50 mb-0">Start sharing and tracking bills with roommates.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" action="">
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label fw-semibold") }}
+                            {% if form.name.errors %}
+                                {{ form.name(class="form-control is-invalid border-2") }}
+                                <div class="invalid-feedback">
+                                    {% for error in form.name.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                {{ form.name(class="form-control border-2", placeholder="e.g. Flat 4B Spends") }}
+                            {% endif %}
+                        </div>
+                        <div class="mb-4">
+                            {{ form.description.label(class="form-label fw-semibold") }}
+                            {{ form.description(class="form-control border-2", placeholder="e.g. Monthly rent, groceries, electricity, and trips") }}
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('group.index') }}" class="btn btn-light px-4 me-md-2">Cancel</a>
+                            {{ form.submit(class="btn btn-primary px-4 shadow-sm") }}
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
