@@ -38,6 +38,7 @@
     {% endif %}
 
     <form method="POST" action="{{ url_for('group.import_confirm', group_id=group.id) }}">
+        <input type="hidden" name="import_b64" value="{{ import_b64 }}">
         <!-- Table of Records to Import -->
         <div class="card border-0 shadow rounded-4 mb-4 overflow-hidden">
             <div class="card-header bg-dark text-white p-3">
