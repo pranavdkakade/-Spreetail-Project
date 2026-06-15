@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-0 shadow rounded-4 overflow-hidden">
+                <div class="card-header bg-success text-white p-4">
+                    <h3 class="fw-bold mb-0">Record Payment / Settlement</h3>
+                    <p class="text-white-50 mb-0">Record a direct cash transfer to pay back a debt between flatmates.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" id="settlementForm">
+                        <div class="mb-4">
+                            <label for="payer_id" class="form-label fw-bold">Who Paid (Payer)</label>
+                            <select class="form-select border-2" id="payer_id" name="payer_id" required>
+                                <option value="" disabled selected>Select payer...</option>
+                                {% for m in members %}
+                                <option value="{{ m.id }}" {% if m.id == current_user.id %}selected{% endif %}>{{ m.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">The member who is handing over the cash.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="payee_id" class="form-label fw-bold">Who Received (Payee)</label>
+                            <select class="form-select border-2" id="payee_id" name="payee_id" required>
+                                <option value="" disabled selected>Select payee...</option>
+                                {% for m in members %}
+                                <option value="{{ m.id }}" {% if m.id != current_user.id and loop.index == 2 %}selected{% endif %}>{{ m.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">The member receiving the cash to reduce their credit.</div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <!-- Amount -->
+                            <div class="col-md-6">
+                                <label for="amount" class="form-label fw-bold">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-2">₹</span>
+                                    <input type="number" step="0.01" class="form-control border-2" id="amount" name="amount" placeholder="0.00" required>
+                                </div>
+                            </div>
+                            <!-- Date -->
+                            <div class="col-md-6">
+                                <label for="date" class="form-label fw-bold">Date</label>
+                                <input type="date" class="form-control border-2" id="date" name="date" required>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between mt-5">
+                            <a href="{{ url_for('group.view', group_id=group.id) }}" class="btn btn-outline-secondary btn-lg px-4">Cancel</a>
+                            <button type="submit" class="btn btn-success btn-lg px-5 shadow">Save Settlement</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set date to today
+        const dateInput = document.getElementById('date');
+        if (!dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+
+        const settlementForm = document.getElementById('settlementForm');
+        const payerSelect = document.getElementById('payer_id');
+        const payeeSelect = document.getElementById('payee_id');
+
+        settlementForm.addEventListener('submit', function(e) {
+            if (payerSelect.value === payeeSelect.value) {
+                e.preventDefault();
+                alert('Payer and Payee cannot be the same user!');
+            }
+        });
+    });
+</script>
+{% endblock %}

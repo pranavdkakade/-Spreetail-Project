@@ -289,12 +289,184 @@ def import_confirm(group_id):
 @group_bp.route('/<int:group_id>/expenses/new', methods=['GET', 'POST'])
 @login_required
 def add_expense(group_id):
-    return f"Stub for adding expense to group {group_id}"
+    group = Group.query.get_or_404(group_id)
+    membership = GroupMember.query.filter_by(user_id=current_user.id, group_id=group.id, left_at=None).first()
+    if not membership:
+        flash('You are not an active member of this group.', 'danger')
+        return redirect(url_for('group.index'))
+    
+    active_memberships = GroupMember.query.filter_by(group_id=group.id, left_at=None).all()
+    members = [m.user for m in active_memberships]
+    
+    if request.method == 'POST':
+        description = request.form.get('description')
+        amount_str = request.form.get('amount')
+        currency = request.form.get('currency', 'INR')
+        paid_by_id = request.form.get('paid_by_id')
+        date_str = request.form.get('date')
+        split_type = request.form.get('split_type', 'EQUAL').upper()
+        
+        try:
+            amount = Decimal(amount_str)
+        except Exception:
+            flash('Invalid amount entered.', 'danger')
+            return render_template('group/expense_create.html', group=group, members=members)
+            
+        date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc) if date_str else datetime.now(timezone.utc)
+        
+        from decimal import ROUND_HALF_UP
+        if currency == 'USD':
+            rate = Decimal('83.00')
+            amount_inr = (amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            description = f"{description} (USD {amount} @ {rate})"
+            amount = amount_inr
+            currency = 'INR'
+        
+        split_member_ids = []
+        split_details = {}
+        for m in members:
+            if request.form.get(f'split_member_{m.id}') == 'yes':
+                split_member_ids.append(m.id)
+                val = request.form.get(f'split_val_{m.id}', '0')
+                try:
+                    split_details[m.id] = Decimal(val) if val else Decimal('0')
+                except Exception:
+                    split_details[m.id] = Decimal('0')
+                    
+        if not split_member_ids:
+            flash('You must select at least one member to split with.', 'danger')
+            return render_template('group/expense_create.html', group=group, members=members)
+        
+        # Create expense
+        expense = Expense(
+            group_id=group.id,
+            paid_by_id=int(paid_by_id),
+            description=description,
+            amount=amount,
+            currency='INR',
+            date=date,
+            split_type=split_type
+        )
+        db.session.add(expense)
+        db.session.flush()
+        
+        # Calculate splits
+        splits = []
+        from app.models.expense import ExpenseSplit
+        
+        if split_type == 'EQUAL':
+            share = (amount / len(split_member_ids)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            allocated = Decimal('0.00')
+            for mid in split_member_ids[:-1]:
+                splits.append((mid, share))
+                allocated += share
+            splits.append((split_member_ids[-1], amount - allocated))
+            
+        elif split_type == 'PERCENTAGE':
+            total_pct = sum(split_details[mid] for mid in split_member_ids)
+            allocated = Decimal('0.00')
+            for i, mid in enumerate(split_member_ids):
+                pct = split_details[mid]
+                if total_pct > 0:
+                    share = (amount * (pct / total_pct)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                else:
+                    share = Decimal('0.00')
+                if i < len(split_member_ids) - 1:
+                    splits.append((mid, share))
+                    allocated += share
+                else:
+                    splits.append((mid, amount - allocated))
+                    
+        elif split_type == 'UNEQUAL':
+            total_amt = sum(split_details[mid] for mid in split_member_ids)
+            allocated = Decimal('0.00')
+            for i, mid in enumerate(split_member_ids):
+                amt_val = split_details[mid]
+                if total_amt > 0:
+                    share = (amount * (amt_val / total_amt)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                else:
+                    share = Decimal('0.00')
+                if i < len(split_member_ids) - 1:
+                    splits.append((mid, share))
+                    allocated += share
+                else:
+                    splits.append((mid, amount - allocated))
+                    
+        elif split_type == 'SHARE':
+            total_shares = sum(split_details[mid] for mid in split_member_ids)
+            allocated = Decimal('0.00')
+            for i, mid in enumerate(split_member_ids):
+                sh = split_details[mid]
+                if total_shares > 0:
+                    share = (amount * (sh / total_shares)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                else:
+                    share = Decimal('0.00')
+                if i < len(split_member_ids) - 1:
+                    splits.append((mid, share))
+                    allocated += share
+                else:
+                    splits.append((mid, amount - allocated))
+        
+        # Save splits
+        for mid, amt in splits:
+            exp_split = ExpenseSplit(
+                expense_id=expense.id,
+                user_id=mid,
+                amount=amt
+            )
+            db.session.add(exp_split)
+            
+        db.session.commit()
+        flash('Expense created successfully!', 'success')
+        return redirect(url_for('group.view', group_id=group.id))
+        
+    return render_template('group/expense_create.html', group=group, members=members)
 
 @group_bp.route('/<int:group_id>/settlements/new', methods=['GET', 'POST'])
 @login_required
 def record_settlement(group_id):
-    return f"Stub for recording settlement in group {group_id}"
+    group = Group.query.get_or_404(group_id)
+    membership = GroupMember.query.filter_by(user_id=current_user.id, group_id=group.id, left_at=None).first()
+    if not membership:
+        flash('You are not an active member of this group.', 'danger')
+        return redirect(url_for('group.index'))
+    
+    active_memberships = GroupMember.query.filter_by(group_id=group.id, left_at=None).all()
+    members = [m.user for m in active_memberships]
+    
+    if request.method == 'POST':
+        payer_id = request.form.get('payer_id')
+        payee_id = request.form.get('payee_id')
+        amount_str = request.form.get('amount')
+        date_str = request.form.get('date')
+        
+        if payer_id == payee_id:
+            flash('Payer and Payee cannot be the same user.', 'danger')
+            return render_template('group/settlement_create.html', group=group, members=members)
+            
+        try:
+            amount = Decimal(amount_str)
+        except Exception:
+            flash('Invalid amount entered.', 'danger')
+            return render_template('group/settlement_create.html', group=group, members=members)
+            
+        date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc) if date_str else datetime.now(timezone.utc)
+        
+        from app.models.expense import Settlement
+        settlement = Settlement(
+            group_id=group.id,
+            payer_id=int(payer_id),
+            payee_id=int(payee_id),
+            amount=amount,
+            date=date
+        )
+        db.session.add(settlement)
+        db.session.commit()
+        
+        flash('Settlement payment recorded successfully!', 'success')
+        return redirect(url_for('group.view', group_id=group.id))
+        
+    return render_template('group/settlement_create.html', group=group, members=members)
 
 @group_bp.route('/<int:group_id>/members/<int:user_id>/ledger', methods=['GET'])
 @login_required

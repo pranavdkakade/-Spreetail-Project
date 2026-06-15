@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-9">
+            <div class="card border-0 shadow rounded-4 overflow-hidden">
+                <div class="card-header bg-dark text-white p-4">
+                    <h3 class="fw-bold mb-0">Record New Expense</h3>
+                    <p class="text-white-50 mb-0">Create a manual expense and choose how it is split among group members.</p>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" id="expenseForm">
+                        <div class="row g-3 mb-4">
+                            <!-- Description -->
+                            <div class="col-md-6">
+                                <label for="description" class="form-label fw-bold">Description</label>
+                                <input type="text" class="form-control border-2" id="description" name="description" placeholder="e.g. Dinner, Rent, Snacks" required>
+                            </div>
+                            <!-- Date -->
+                            <div class="col-md-6">
+                                <label for="date" class="form-label fw-bold">Date</label>
+                                <input type="date" class="form-control border-2" id="date" name="date" value="{{ date_now }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <!-- Amount -->
+                            <div class="col-md-4">
+                                <label for="amount" class="form-label fw-bold">Amount</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" class="form-control border-2" id="amount" name="amount" placeholder="0.00" required>
+                                </div>
+                            </div>
+                            <!-- Currency -->
+                            <div class="col-md-4">
+                                <label for="currency" class="form-label fw-bold">Currency</label>
+                                <select class="form-select border-2" id="currency" name="currency">
+                                    <option value="INR" selected>INR (₹)</option>
+                                    <option value="USD">USD ($)</option>
+                                </select>
+                            </div>
+                            <!-- Paid By -->
+                            <div class="col-md-4">
+                                <label for="paid_by_id" class="form-label fw-bold">Paid By</label>
+                                <select class="form-select border-2" id="paid_by_id" name="paid_by_id">
+                                    {% for m in members %}
+                                    <option value="{{ m.id }}" {% if m.id == current_user.id %}selected{% endif %}>{{ m.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="split_type" class="form-label fw-bold">Split Method</label>
+                            <select class="form-select border-2" id="split_type" name="split_type">
+                                <option value="EQUAL" selected>Equally</option>
+                                <option value="PERCENTAGE">By Percentages</option>
+                                <option value="UNEQUAL">Unequally (Exact amounts)</option>
+                                <option value="SHARE">By Shares (Weights)</option>
+                            </select>
+                        </div>
+
+                        <!-- Split members list -->
+                        <div class="card bg-light border-0 rounded-4 p-4 mb-4">
+                            <h5 class="fw-bold mb-3 text-dark">Split With</h5>
+                            
+                            <div class="list-group list-group-flush bg-transparent" id="split-members-list">
+                                {% for m in members %}
+                                <div class="list-group-item bg-transparent px-0 py-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom">
+                                    <div class="form-check mb-2 mb-sm-0">
+                                        <input class="form-check-input border-2 split-member-checkbox" type="checkbox" name="split_member_{{ m.id }}" id="split_member_{{ m.id }}" value="yes" checked>
+                                        <label class="form-check-label fw-semibold text-dark ms-2" for="split_member_{{ m.id }}">
+                                            {{ m.username }}
+                                        </label>
+                                    </div>
+                                    <div class="input-group split-val-container d-none" style="width: 180px;">
+                                        <span class="input-group-text bg-white border-2 split-val-addon">Value</span>
+                                        <input type="number" step="any" class="form-control border-2 split-val-input" name="split_val_{{ m.id }}" data-user-id="{{ m.id }}" value="1">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex justify-content-between mt-5">
+                            <a href="{{ url_for('group.view', group_id=group.id) }}" class="btn btn-outline-secondary btn-lg px-4">Cancel</a>
+                            <button type="submit" class="btn btn-primary btn-lg px-5 shadow">Save Expense</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Form Javascript -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const splitTypeSelect = document.getElementById('split_type');
+        const splitValContainers = document.querySelectorAll('.split-val-container');
+        const splitValAddons = document.querySelectorAll('.split-val-addon');
+        const splitValInputs = document.querySelectorAll('.split-val-input');
+        const checkboxes = document.querySelectorAll('.split-member-checkbox');
+        const expenseForm = document.getElementById('expenseForm');
+        
+        function handleSplitTypeChange() {
+            const splitType = splitTypeSelect.value;
+            
+            splitValContainers.forEach(container => {
+                const input = container.querySelector('.split-val-input');
+                const checkbox = container.closest('.list-group-item').querySelector('.split-member-checkbox');
+                
+                if (splitType === 'EQUAL') {
+                    container.classList.add('d-none');
+                    input.required = false;
+                } else {
+                    if (checkbox.checked) {
+                        container.classList.remove('d-none');
+                        input.required = true;
+                    } else {
+                        container.classList.add('d-none');
+                        input.required = false;
+                    }
+                    
+                    // Setup addons and defaults
+                    const addon = container.querySelector('.split-val-addon');
+                    if (splitType === 'PERCENTAGE') {
+                        addon.textContent = '%';
+                        if (input.value == '1' || input.value === '') input.value = (100 / document.querySelectorAll('.split-member-checkbox:checked').length).toFixed(0);
+                    } else if (splitType === 'UNEQUAL') {
+                        addon.textContent = '₹';
+                        if (input.value == '1') input.value = '';
+                    } else if (splitType === 'SHARE') {
+                        addon.textContent = 'share';
+                        if (input.value === '') input.value = '1';
+                    }
+                }
+            });
+        }
+        
+        splitTypeSelect.addEventListener('change', handleSplitTypeChange);
+        
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const item = this.closest('.list-group-item');
+                const container = item.querySelector('.split-val-container');
+                const input = item.querySelector('.split-val-input');
+                
+                if (splitTypeSelect.value !== 'EQUAL') {
+                    if (this.checked) {
+                        container.classList.remove('d-none');
+                        input.required = true;
+                    } else {
+                        container.classList.add('d-none');
+                        input.required = false;
+                        input.value = '';
+                    }
+                }
+            });
+        });
+        
+        // Form Validation for Percentages
+        expenseForm.addEventListener('submit', function(e) {
+            const splitType = splitTypeSelect.value;
+            if (splitType === 'PERCENTAGE') {
+                let sum = 0;
+                let hasActive = false;
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        hasActive = true;
+                        const item = cb.closest('.list-group-item');
+                        const val = parseFloat(item.querySelector('.split-val-input').value) || 0;
+                        sum += val;
+                    }
+                });
+                
+                if (hasActive && Math.abs(sum - 100) > 0.1) {
+                    e.preventDefault();
+                    alert('Percentages must sum up to exactly 100%! Current sum is: ' + sum + '%');
+                }
+            }
+        });
+        
+        // Initial setup
+        // Set date to today
+        const dateInput = document.getElementById('date');
+        if (!dateInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+        
+        handleSplitTypeChange();
+    });
+</script>
+{% endblock %}
